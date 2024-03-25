@@ -193,7 +193,7 @@ store_row_loop:
 end_store:
     
 add $t1 $s5 $s0 # temp to store current address
-# we also need to store the current direction of the tetris
+li $t2 0 # store the current direction of tetris
 draw_I: # step 3: draw tetris
     li $t6 0 # counter to store height
     move $t5 $t1
@@ -220,21 +220,81 @@ processing_loop: # step 4: enter the main processing loop for each tetris
     move_left:
         jal repaint
         addi $t1 $t1 -4
-        j draw_I
+        beq $t2 0 draw_I
+        beq $t2 1 draw_1
+        beq $t2 2 draw_2
+        beq $t2 3 draw_3
         
     move_right:
         jal repaint
         addi $t1 $t1 4
-        j draw_I
+        beq $t2 0 draw_I
+        beq $t2 1 draw_1
+        beq $t2 2 draw_2
+        beq $t2 3 draw_3
     
     move_down:
         jal repaint
         add $t1 $t1 64
-        j draw_I
+        beq $t2 0 draw_I
+        beq $t2 1 draw_1
+        beq $t2 2 draw_2
+        beq $t2 3 draw_3
     
     rotate:
+        jal repaint
+        
+        # rotate based on current direction
+        beq $t2 0 rotate_0_1
+        beq $t2 1 rotate_1_2
+        beq $t2 2 rotate_2_3
+        beq $t2 3 rotate_3_0
+        
+        rotate_0_1:
+            li $t2 1 # change direction
+            j draw_1
+        rotate_1_2:
+            li $t2 2
+            j draw_2
+        
+        rotate_2_3:
+            li $t2 3
+            j draw_3
+            
+        rotate_3_0:
+            li $t2 0
+            j draw_I
+        
+        draw_1:
+            li $t6 0 # counter to store height
+            move $t5 $t1
+            draw_height_1: 
+                bge $t6 4 processing_loop
+                sw $s3 0($t5) # store the color
+                addi $t6 $t6 1
+                addi $t5 $t5 -4
+                j draw_height_1
+                
+        draw_2:
+            li $t6 0 # counter to store height
+            move $t5 $t1
+            draw_height_2: 
+                bge $t6 4 processing_loop
+                sw $s3 0($t5) # store the color
+                addi $t6 $t6 1
+                addi $t5 $t5 -64
+                j draw_height_2
+        
+        draw_3:
+            li $t6 0 # counter to store height
+            move $t5 $t1
+            draw_height_3: 
+                bge $t6 4 processing_loop
+                sw $s3 0($t5) # store the color
+                addi $t6 $t6 1
+                addi $t5 $t5 4
+                j draw_height_3
    
-
     repaint:
         la $t0 BOARD_BUFFER
         li $t3 0 # store y coordinate
