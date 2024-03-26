@@ -173,6 +173,7 @@ li $s3 0x0000ff # blue
 li $s4 0 # initial y position
 li $s5 32 # initial x position
 
+
 # step 1: check for terminate condition
 # step 2: store the game board
 store_board:
@@ -213,7 +214,26 @@ draw_I: # step 3: draw tetris
         j draw_height
 
 processing_loop: # step 4: enter the main processing loop for each tetris
-
+    movable:
+        add $t1 $t1 64
+        beq $t2, 0, try_move_0
+        bne $t2, 0, try_move_123
+        
+        try_move_0:
+            lw $t9, 192($t1)  # Load the byte (color) from the address in $t0 into $t1
+            j not_black
+        try_move_123:
+            lw $t9, 0($t1)
+            j not_black
+        
+        not_black:
+            bne $t9, $v0, not_grey
+            j check_keyboard
+        
+        not_grey:
+            addi $t1 $t1 -64
+            bne $t9, $v1, tetris_loop   
+            
     check_keyboard:
         lw $t3 ADDR_KBRD
         lw $t4 0($t3) # load first word from keyboard
@@ -224,6 +244,7 @@ processing_loop: # step 4: enter the main processing loop for each tetris
         beq $t7 0x77 rotate
         beq $t7 0x64 move_right
         beq $t7 0x73 move_down
+        beq $t7 0x71 quit
         
     move_left:
         jal repaint
@@ -408,3 +429,7 @@ processing_loop: # step 4: enter the main processing loop for each tetris
   
     end_repaint:
         jr $ra
+    
+    quit:
+        li $v0 10
+        syscall
