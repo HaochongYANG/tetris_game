@@ -224,6 +224,7 @@ processing_loop: # step 4: enter the main processing loop for each tetris
         beq $t7 0x77 rotate
         beq $t7 0x64 move_right
         beq $t7 0x73 move_down
+        beq $t7 0x71 quit
         
     move_left:
         jal repaint
@@ -408,3 +409,7 @@ processing_loop: # step 4: enter the main processing loop for each tetris
   
     end_repaint:
         jr $ra
+
+quit:
+    li $v0, 10           # Load the exit service code into register $v0
+    syscall              # Execute the syscall, which terminates the program
