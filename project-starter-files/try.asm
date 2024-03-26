@@ -25,12 +25,20 @@ ADDR_KBRD:
 BOARD_BUFFER:
     .space 16384 # to store 128 * 128 board
 
+GRAY_BG:
+    .word 0x1b1b1b
+BLACK_BG:
+    .word 0x17161A
+WALL_BG:
+    .word 0x00ff00
+
 .text
 
 draw_initial_board:
     lw $t0, ADDR_DSPL           # Load the display's base address
-    li $t6, 0x17161A            # Color 1 (Dark Grey)
-    li $t7, 0x1b1b1b            # Color 2 (Lighter Grey)
+    lw $v0, BLACK_BG
+    lw $v1, GRAY_BG
+    lw $a3, WALL_BG
 
     li $s0, 16                  # Side length of the checkerboard (units, not pixels)
     li $s1, 0                   # Row counter for units
@@ -43,10 +51,10 @@ inner_loop:                   # This loop will go through each column of units
     add $t4, $s1, $s2         # Add row and column numbers of units
     andi $t4, $t4, 1          # Check if the sum is even or odd
     beq $t4, $zero, even      # If even, choose Color 1
-    move $t4, $t7             # Otherwise, choose Color 2
+    move $t4, $v1             # Otherwise, choose Color 2
     j paint_unit
 even:
-    move $t4, $t6             # Choose Color 1 for even
+    move $t4, $v0             # Choose Color 1 for even
 
 paint_unit:
     # Paint the 2x2 unit
@@ -92,7 +100,7 @@ final:
     li $t4, 0x00ff00            # Load the color black into $t4
     
     li $a0, 0                    # x-coordinate (column) is 0 for the leftmost column
-    li $a1, 0                    # Starting y-coordinate (row) is 0
+    li $a1, 1                   # Starting y-coordinate (row) is 0
     li $a2, 16                   # Ending y-coordinate (31 rows in total)
     sll $t1, $a0, 2              # Shift left x-coordinate by 2 to account for word size (4 bytes per pixel)
 
@@ -111,7 +119,7 @@ final1:
     li $t4, 0x00ff00             # Load the color black into $t4
     
     li $a0, 15                   # x-coordinate (column) is 1 for the second leftmost column
-    li $a1, 0                    # Starting y-coordinate (row) is 0
+    li $a1, 1                    # Starting y-coordinate (row) is 0
     li $a2, 16                   # Ending y-coordinate (31 rows in total)
     
     sll $t1, $a0, 2              # Shift left x-coordinate by 2 to account for word size (4 bytes per pixel)
@@ -162,9 +170,56 @@ li $s1 0xff0000 # red
 li $s2 0x00ff00 # green
 li $s3 0x0000ff # blue
 
-li $s4 0 # initial y position
+li $s4 64 # initial y position
 li $s5 32 # initial x position
 
+addi $t1 $s0 4 # first address to start
+li $t0 1 # coutner for the remove line loop
+remove_line_loop: # step 0: remove line
+    bge $t0 15 check_terminate
+    li $t6 64 # constant
+    mul $t2 $t6 $t0 # offset to add
+    add $t2 $t1 $t2 # current starting address for the row
+    
+    move $t3 $t2 # temp to store the current starting point
+    li $t5 0 # counter for detect line loop
+    detect_line:
+        bge $t5 14 move_all_line_loop # if not break, remove the entire line
+        lw $t4 0($t3)
+        beq $t4, $v0, update_remove_line_loop
+        beq $t4, $v1, update_remove_line_loop
+        addi $t3 $t3 4
+        addi $t5 $t5 1
+        j detect_line
+    
+    move_all_line_loop: # use the color from previous line
+        move $t5 $t0 # current line
+        move $t3 $t2 # temp to store the current starting point
+        move_all_line:
+            ble $t5 0 update_remove_line_loop
+            addi $t5 $t5 -1 # decrement counter
+            addi $t3 $t3 -64 # starting address for the previous row
+            
+            li $t6 0 # counter for move line
+            move $t7 $t3 # temp to store starting address for the previous row
+            move_line:
+                bge $t6 14 move_all_line
+                lw $t8 0($t7) # value from previous line
+                lw $t9 64($t7) # value from current line
+                store_value:
+                    beq $t9 $v0 update_move_line
+                    beq $t9 $v1 update_move_line
+                    sw $t8 64($t7) # store the color from previous line to current line
+                update_move_line:
+                    addi $t6 $t6 1
+                    addi $t7 $t7 4
+                    j move_line
+
+    update_remove_line_loop:
+        addi $t0 $t0 1
+        j remove_line_loop
+        
+check_terminate:
 # step 1: check for terminate condition
 # step 2: store the game board
 store_board:
@@ -192,7 +247,8 @@ store_row_loop:
         
 end_store:
     
-add $t1 $s5 $s0 # temp to store current address
+add $t1 $s5 $s0 
+add $t1 $t1 $s4 # temp to store current address
 li $t2 0 # store the current direction of tetris
 draw_I: # step 3: draw tetris
     li $t6 0 # counter to store height
@@ -205,7 +261,27 @@ draw_I: # step 3: draw tetris
         j draw_height
 
 processing_loop: # step 4: enter the main processing loop for each tetris
-
+    movable:
+        add $t1 $t1 64
+        beq $t2, 0, try_move_0
+        bne $t2, 0, try_move_123
+        
+        try_move_0:
+            lw $t9, 192($t1) # Load the byte (color) from the address in $t0 into $t1
+            addi $t1 $t1 -64
+            j not_black
+        try_move_123:
+            lw $t9, 0($t1)
+            addi $t1 $t1 -64
+            j not_black
+        
+        not_black:
+            bne $t9, $v0, not_grey
+            j check_keyboard
+        
+        not_grey:
+            bne $t9, $v1, tetris_loop   
+            
     check_keyboard:
         lw $t3 ADDR_KBRD
         lw $t4 0($t3) # load first word from keyboard
@@ -216,34 +292,115 @@ processing_loop: # step 4: enter the main processing loop for each tetris
         beq $t7 0x77 rotate
         beq $t7 0x64 move_right
         beq $t7 0x73 move_down
+        beq $t7 0x71 quit
         
     move_left:
         jal repaint
         addi $t1 $t1 -4
-        beq $t2 0 draw_I
-        beq $t2 1 draw_1
-        beq $t2 2 draw_2
-        beq $t2 3 draw_3
+        
+        bne $t2, 1, ASSIGNLEFT0 
+        beq $t2, 1, ASSIGNLEFT1
+        
+        ASSIGNLEFT0:
+            lw $t9, 0($t1)  # Load the byte (color) from the address in $t0 into $t1
+            j DETERMINE_LEFT
+        ASSIGNLEFT1:
+            lw $t9, -12($t1)  # Load the byte (color) from the address in $t0 into $t1
+            j DETERMINE_LEFT
+        
+        DETERMINE_LEFT:
+        beq $t9, $v0, DRAW  # If colour meets requirement, we can do the drawing accordingly
+        beq $t9, $v1, DRAW  # If colour meets requirement, we can do the drawing accordingly
+        addi $t1 $t1 4      # Being skipped if the colour meets, will revert the shifting if the colour violates the requirements
+        DRAW:
+            beq $t2 0 draw_I 
+            beq $t2 1 draw_1
+            beq $t2 2 draw_2
+            beq $t2 3 draw_3
         
     move_right:
         jal repaint
         addi $t1 $t1 4
-        beq $t2 0 draw_I
-        beq $t2 1 draw_1
-        beq $t2 2 draw_2
-        beq $t2 3 draw_3
+        bne $t2, 3, ASSIGNRIGHT0 
+        beq $t2, 3, ASSIGNRIGHT3
+        
+        ASSIGNRIGHT0:
+            lw $t9, 0($t1)  # Load the byte (color) from the address in $t0 into $t1
+            j DETERMINE_RIGHT
+        ASSIGNRIGHT3:
+            lw $t9, 12($t1)  # Load the byte (color) from the address in $t0 into $t1
+            j DETERMINE_RIGHT
+        
+        DETERMINE_RIGHT:
+        beq $t9, $v0, DRAW
+        beq $t9, $v1, DRAW
+        addi $t1 $t1 -4
+        DRAW:
+            beq $t2 0 draw_I
+            beq $t2 1 draw_1
+            beq $t2 2 draw_2
+            beq $t2 3 draw_3
     
     move_down:
         jal repaint
         add $t1 $t1 64
-        beq $t2 0 draw_I
-        beq $t2 1 draw_1
-        beq $t2 2 draw_2
-        beq $t2 3 draw_3
+        beq $t2, 0, ASSIGNDOWN0
+        bne $t2, 0, ASSIGNDOWN123
+        
+        ASSIGNDOWN0:
+            lw $t9, 192($t1)  # Load the byte (color) from the address in $t0 into $t1
+            j DETERMINE_DOWN
+        ASSIGNDOWN123:
+            lw $t9, 0($t1)
+            j DETERMINE_DOWN
+            
+        DETERMINE_DOWN:
+        beq $t9, $v0, DRAW
+        beq $t9, $v1, DRAW
+        addi $t1 $t1 -64
+        
+        DRAW:
+            beq $t2 0 draw_I
+            beq $t2 1 draw_1
+            beq $t2 2 draw_2
+            beq $t2 3 draw_3
     
     rotate:
         jal repaint
         
+        beq $t2 0 check_rotate_0_1
+        beq $t2 1 rotate_1_2
+        beq $t2 2 check_rotate_2_3
+        beq $t2 3 check_rotate_3_0
+        
+        check_rotate_0_1:
+        lw $t9, -4($t1)
+        beq $t9, $a3, draw_I
+        lw $t8, -8($t1)
+        beq $t8, $a3, draw_I
+        lw $t7, -12($t1)
+        beq $t7, $a3, draw_I
+        j ROTATE_CHECKED
+        
+        check_rotate_2_3:
+        lw $t9, 4($t1)
+        beq $t9, $a3, draw_2
+        lw $t8, 8($t1)
+        beq $t8, $a3, draw_2
+        lw $t7, 12($t1)
+        beq $t7, $a3, draw_2
+        j ROTATE_CHECKED
+        
+        check_rotate_3_0:
+        lw $t9, 64($t1)
+        beq $t9, $a3, draw_3
+        lw $t8, 128($t1)
+        beq $t8, $a3, draw_3
+        lw $t7, 196($t1)
+        beq $t7, $a3, draw_3
+        j ROTATE_CHECKED
+        
+        ROTATE_CHECKED:
         # rotate based on current direction
         beq $t2 0 rotate_0_1
         beq $t2 1 rotate_1_2
@@ -320,6 +477,10 @@ processing_loop: # step 4: enter the main processing loop for each tetris
   
     end_repaint:
         jr $ra
+
+    quit:
+        li $v0 10
+        syscall
         
     
     
