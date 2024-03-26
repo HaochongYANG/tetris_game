@@ -25,21 +25,15 @@ ADDR_KBRD:
 BOARD_BUFFER:
     .space 16384 # to store 128 * 128 board
 
-GRAY_BG:
-    .word 0x1b1b1b
-BLACK_BG:
-    .word 0x17161A
-WALL_BG:
-    .word 0x00ff00
+gameOverMsg: .asciiz "Game Over! Press 'r' to restart !"
 
 .text
-
-draw_initial_board:
+start:
     lw $t0, ADDR_DSPL           # Load the display's base address
-    lw $v0, BLACK_BG
-    lw $v1, GRAY_BG
-    lw $a3, WALL_BG
-
+    li $s6, 0x17161A
+    li $s7, 0x1b1b1b
+    li $a3, 0x00ff00
+draw_initial_board:
     li $s0, 16                  # Side length of the checkerboard (units, not pixels)
     li $s1, 0                   # Row counter for units
 
@@ -51,10 +45,10 @@ inner_loop:                   # This loop will go through each column of units
     add $t4, $s1, $s2         # Add row and column numbers of units
     andi $t4, $t4, 1          # Check if the sum is even or odd
     beq $t4, $zero, even      # If even, choose Color 1
-    move $t4, $v1             # Otherwise, choose Color 2
+    move $t4, $s7             # Otherwise, choose Color 2
     j paint_unit
 even:
-    move $t4, $v0             # Choose Color 1 for even
+    move $t4, $s6             # Choose Color 1 for even
 
 paint_unit:
     # Paint the 2x2 unit
@@ -145,7 +139,7 @@ addi $a1, $zero, 16	# set width = 10
 # Draw a rectangle:
 add $t6, $zero, $zero	# Set index value ($t6) to zero
 draw_rect_loop:
-beq $t6, $a0, tetris_loop  	# If $t6 == height ($a0), jump to end
+beq $t6, $a0, draw_random_block  	# If $t6 == height ($a0), jump to end
 
 # Draw a line:
 add $t5, $zero, $zero	# Set index value ($t5) to zero
@@ -163,6 +157,45 @@ addi $t6, $t6, 1	#   - Increment $t6 by 1
 j draw_rect_loop	#   - Jump to start of rectangle drawing loop
 
 
+
+
+
+# ----------- main game --------------
+draw_random_block:
+lw $s0 ADDR_DSPL
+li $s1 0xff0000 # red
+li $s2 0x00ff00 # green
+li $s3 0x0000ff # blue
+
+li $t0 10 # counter for the draw random block
+addi $t1 $s0 4 # first address to start
+draw_random_block_loop:
+    bge $t0 15 tetris_loop
+    li $t6 64 # constant
+    mul $t2 $t6 $t0 # offset to add
+    add $t2 $t1 $t2 # current starting address for the row
+    
+    move $t3 $t2 # temp to store the current starting point
+    li $t5 0 # counter for draw random  loop
+    draw_random:
+        bge $t5 14 update_draw_random_block
+        li $v0, 42
+        li $a0, 0
+        li $a1, 10
+        syscall # generate a random number between 0-9
+        bne $a0 1 update_draw_random # if the number is not 1, skip that i.e., 10% chance to draw a block
+        sw $s1 0($t3)
+        j update_draw_random
+    
+        update_draw_random:
+            addi $t5 $t5 1
+            addi $t3 $t3 4
+            j draw_random
+        
+    update_draw_random_block:
+        addi $t0 $t0 1
+        j draw_random_block_loop
+
 tetris_loop:
 lw $s0 ADDR_DSPL
 
@@ -170,9 +203,8 @@ li $s1 0xff0000 # red
 li $s2 0x00ff00 # green
 li $s3 0x0000ff # blue
 
-li $s4 64 # initial y position
-li $s5 32 # initial x position
-
+li $s4 10000000 # counter for clock
+# step 0: remove line
 addi $t1 $s0 4 # first address to start
 li $t0 1 # coutner for the remove line loop
 remove_line_loop: # step 0: remove line
@@ -186,8 +218,8 @@ remove_line_loop: # step 0: remove line
     detect_line:
         bge $t5 14 move_all_line_loop # if not break, remove the entire line
         lw $t4 0($t3)
-        beq $t4, $v0, update_remove_line_loop
-        beq $t4, $v1, update_remove_line_loop
+        beq $t4, $s6, update_remove_line_loop
+        beq $t4, $s7, update_remove_line_loop
         addi $t3 $t3 4
         addi $t5 $t5 1
         j detect_line
@@ -207,17 +239,17 @@ remove_line_loop: # step 0: remove line
                 lw $t8 0($t7) # value from previous line
                 lw $t9 64($t7) # value from current line
                 store_value:
-                    beq $t9 $v0 update_move_line
-                    beq $t9 $v1 update_move_line
-                    beq $t8 $v0 to_grey #if previous line is black, change it to grey
-                    beq $t8 $v1 to_black #if previous line is grey, change it to black
+                    beq $t9 $s6 update_move_line
+                    beq $t9 $s7 update_move_line
+                    beq $t8 $s6 to_grey #if previous line is black, change it to grey
+                    beq $t8 $s7 to_black #if previous line is grey, change it to black
                     j update_move_line
                 to_grey:
-                    move $t8 $v1
+                    move $t8 $s7
                     sw $t8 64($t7) # store the color from previous line to current line
                     j update_move_line
                 to_black:
-                    move $t8 $v0
+                    move $t8 $s6
                     sw $t8 64($t7) # store the color from previous line to current line
                     j update_move_line
                 update_move_line:
@@ -228,9 +260,20 @@ remove_line_loop: # step 0: remove line
     update_remove_line_loop:
         addi $t0 $t0 1
         j remove_line_loop
-        
+    
+ # step 1: check for terminate condition       
 check_terminate:
-# step 1: check for terminate condition
+    addi $t1 $s0 4 # address to start
+    li $t0 0 # coutner for the remove line loop
+    check_terminate_loop:
+        bge $t0 14 store_board
+        lw $t2 0($t1)
+        addi $t0 $t0 1
+        addi $t1 $t1 4
+        beq $t2 $s6 check_terminate_loop
+        beq $t2 $s7 check_terminate_loop
+        j game_over
+
 # step 2: store the game board
 store_board:
     la $t0 BOARD_BUFFER
@@ -256,11 +299,12 @@ store_row_loop:
         j store_row_loop
         
 end_store:
-    
-add $t1 $s5 $s0 
-add $t1 $t1 $s4 # temp to store current address
+
+# step 3: draw tetris
+addi $t1 $s0 32
+add $t1 $t1 $zero # temp to store current address
 li $t2 0 # store the current direction of tetris
-draw_I: # step 3: draw tetris
+draw_I:
     li $t6 0 # counter to store height
     move $t5 $t1
     draw_height: 
@@ -270,7 +314,8 @@ draw_I: # step 3: draw tetris
         addi $t5 $t5 64
         j draw_height
 
-processing_loop: # step 4: enter the main processing loop for each tetris
+# step 4: enter the main processing loop for each tetris
+processing_loop: 
     movable:
         add $t1 $t1 64
         beq $t2, 0, try_move_0
@@ -286,13 +331,16 @@ processing_loop: # step 4: enter the main processing loop for each tetris
             j not_black
         
         not_black:
-            bne $t9, $v0, not_grey
+            bne $t9, $s6, not_grey
             j check_keyboard
         
         not_grey:
-            bne $t9, $v1, tetris_loop   
-            
+            bne $t9, $s7, tetris_loop   
+    
+    li $a0 0 # timing counter
     check_keyboard:
+        bge $a0 $s4 gravity # gravity
+        addi $a0 $a0 1 # increment timing counter
         lw $t3 ADDR_KBRD
         lw $t4 0($t3) # load first word from keyboard
         beq $t4 0 check_keyboard # no key
@@ -303,26 +351,122 @@ processing_loop: # step 4: enter the main processing loop for each tetris
         beq $t7 0x64 move_right
         beq $t7 0x73 move_down
         beq $t7 0x71 quit
+        beq $t7 'p' pause_loop
+        j check_keyboard
+    
+    gravity:
+        addi $s4 $s4 -1000000
+        j move_down
+    
+    pause_loop:
+        lw $t4 0($t3)
+        beq $t4 0 pause_loop
+        lw $t7 4($t3)
+        bne $t7 'p' pause_loop
+        j check_keyboard
         
-    move_left:
+move_left:
         jal repaint
         addi $t1 $t1 -4
         
-        bne $t2, 1, ASSIGNLEFT0 
-        beq $t2, 1, ASSIGNLEFT1
-        
+        beq $t2, 0, ASSIGNLEFT0 
+        beq $t2, 1, ASSIGNLEFT1 
+        beq $t2, 2, ASSIGNLEFT2 
+        beq $t2, 3, ASSIGNLEFT3 
+   
         ASSIGNLEFT0:
-            lw $t9, 0($t1)  # Load the byte (color) from the address in $t0 into $t1
-            j DETERMINE_LEFT
+            CHECK_LEFT00:
+                lw $t9, 0($t1)
+                beq $t9, $s7, CHECK_LEFT01
+                beq $t9, $s6, CHECK_LEFT01
+                j NOT_SHIFT_LEFT
+            CHECK_LEFT01:
+                lw $t9, 64($t1)
+                beq $t9, $s7, CHECK_LEFT02
+                beq $t9, $s6, CHECK_LEFT02
+                j NOT_SHIFT_LEFT
+            CHECK_LEFT02:
+                lw $t9, 128($t1)
+                beq $t9, $s7, CHECK_LEFT03
+                beq $t9, $s6, CHECK_LEFT03
+                j NOT_SHIFT_LEFT
+            CHECK_LEFT03:
+                lw $t9, 192($t1)
+                beq $t9, $s7, SHIFT_DRAW
+                beq $t9, $s6, SHIFT_DRAW
+                j NOT_SHIFT_LEFT
+            
         ASSIGNLEFT1:
-            lw $t9, -12($t1)  # Load the byte (color) from the address in $t0 into $t1
-            j DETERMINE_LEFT
+            CHECK_LEFT10:
+                lw $t9, 0($t1)
+                beq $t9, $s7, CHECK_LEFT11
+                beq $t9, $s6, CHECK_LEFT11
+                j NOT_SHIFT_LEFT
+            CHECK_LEFT11:
+                lw $t9, -4($t1)
+                beq $t9, $s7, CHECK_LEFT12
+                beq $t9, $s6, CHECK_LEFT12
+                j NOT_SHIFT_LEFT
+            CHECK_LEFT12:
+                lw $t9, -8($t1)
+                beq $t9, $s7, CHECK_LEFT13
+                beq $t9, $s6, CHECK_LEFT13
+                j NOT_SHIFT_LEFT
+            CHECK_LEFT13:
+                lw $t9, -12($t1)
+                beq $t9, $s7, SHIFT_DRAW
+                beq $t9, $s6, SHIFT_DRAW
+                j NOT_SHIFT_LEFT
         
-        DETERMINE_LEFT:
-        beq $t9, $v0, DRAW  # If colour meets requirement, we can do the drawing accordingly
-        beq $t9, $v1, DRAW  # If colour meets requirement, we can do the drawing accordingly
-        addi $t1 $t1 4      # Being skipped if the colour meets, will revert the shifting if the colour violates the requirements
-        DRAW:
+        ASSIGNLEFT2:
+            CHECK_LEFT20:
+                lw $t9, 0($t1)
+                beq $t9, $s7, CHECK_LEFT21
+                beq $t9, $s6, CHECK_LEFT21
+                j NOT_SHIFT_LEFT
+            CHECK_LEFT21:
+                lw $t9, -64($t1)
+                beq $t9, $s7, CHECK_LEFT22
+                beq $t9, $s6, CHECK_LEFT22
+                j NOT_SHIFT_LEFT
+            CHECK_LEFT22:
+                lw $t9, -128($t1)
+                beq $t9, $s7, CHECK_LEFT23
+                beq $t9, $s6, CHECK_LEFT23
+                j NOT_SHIFT_LEFT
+            CHECK_LEFT23:
+                lw $t9, -192($t1)
+                beq $t9, $s7, SHIFT_DRAW
+                beq $t9, $s6, SHIFT_DRAW
+                j NOT_SHIFT_LEFT
+        
+        ASSIGNLEFT3:
+            CHECK_LEFT30:
+                lw $t9, 0($t1)
+                beq $t9, $s7, CHECK_LEFT31
+                beq $t9, $s6, CHECK_LEFT31
+                j NOT_SHIFT_LEFT
+            CHECK_LEFT31:
+                lw $t9, 4($t1)
+                beq $t9, $s7, CHECK_LEFT32
+                beq $t9, $s6, CHECK_LEFT32
+                j NOT_SHIFT_LEFT
+            CHECK_LEFT32:
+                lw $t9, 8($t1)
+                beq $t9, $s7, CHECK_LEFT33
+                beq $t9, $s6, CHECK_LEFT33
+                j NOT_SHIFT_LEFT
+            CHECK_LEFT33:
+                lw $t9, 12($t1)
+                beq $t9, $s7, SHIFT_DRAW
+                beq $t9, $s6, SHIFT_DRAW
+                j NOT_SHIFT_LEFT
+       
+        
+        NOT_SHIFT_LEFT:
+            jal Sound_effect
+            addi $t1, $t1, 4
+        SHIFT_DRAW:
             beq $t2 0 draw_I 
             beq $t2 1 draw_1
             beq $t2 2 draw_2
@@ -331,50 +475,216 @@ processing_loop: # step 4: enter the main processing loop for each tetris
     move_right:
         jal repaint
         addi $t1 $t1 4
-        bne $t2, 3, ASSIGNRIGHT0 
-        beq $t2, 3, ASSIGNRIGHT3
         
+        beq $t2, 0, ASSIGNRIGHT0 
+        beq $t2, 1, ASSIGNRIGHT1 
+        beq $t2, 2, ASSIGNRIGHT2 
+        beq $t2, 3, ASSIGNRIGHT3 
+   
         ASSIGNRIGHT0:
-            lw $t9, 0($t1)  # Load the byte (color) from the address in $t0 into $t1
-            j DETERMINE_RIGHT
-        ASSIGNRIGHT3:
-            lw $t9, 12($t1)  # Load the byte (color) from the address in $t0 into $t1
-            j DETERMINE_RIGHT
+            CHECK_RIGHT00:
+                lw $t9, 0($t1)
+                beq $t9, $s7, CHECK_RIGHT01
+                beq $t9, $s6, CHECK_RIGHT01
+                j NOT_SHIFT_RIGHT
+            CHECK_RIGHT01:
+                lw $t9, 64($t1)
+                beq $t9, $s7, CHECK_RIGHT02
+                beq $t9, $s6, CHECK_RIGHT02
+                j NOT_SHIFT_RIGHT
+            CHECK_RIGHT02:
+                lw $t9, 128($t1)
+                beq $t9, $s7, CHECK_RIGHT03
+                beq $t9, $s6, CHECK_RIGHT03
+                j NOT_SHIFT_RIGHT
+            CHECK_RIGHT03:
+                lw $t9, 192($t1)
+                beq $t9, $s7, SHIFT_DRAW
+                beq $t9, $s6, SHIFT_DRAW
+                j NOT_SHIFT_RIGHT
+            
+        ASSIGNRIGHT1:
+            CHECK_RIGHT10:
+                lw $t9, 0($t1)
+                beq $t9, $s7, CHECK_RIGHT11
+                beq $t9, $s6, CHECK_RIGHT11
+                j NOT_SHIFT_RIGHT
+            CHECK_RIGHT11:
+                lw $t9, -4($t1)
+                beq $t9, $s7, CHECK_RIGHT12
+                beq $t9, $s6, CHECK_RIGHT12
+                j NOT_SHIFT_RIGHT
+            CHECK_RIGHT12:
+                lw $t9, -8($t1)
+                beq $t9, $s7, CHECK_RIGHT13
+                beq $t9, $s6, CHECK_RIGHT13
+                j NOT_SHIFT_RIGHT
+            CHECK_RIGHT13:
+                lw $t9, -12($t1)
+                beq $t9, $s7, SHIFT_DRAW
+                beq $t9, $s6, SHIFT_DRAW
+                j NOT_SHIFT_RIGHT
         
-        DETERMINE_RIGHT:
-        beq $t9, $v0, DRAW
-        beq $t9, $v1, DRAW
-        addi $t1 $t1 -4
-        DRAW:
-            beq $t2 0 draw_I
+        ASSIGNRIGHT2:
+            CHECK_RIGHT20:
+                lw $t9, 0($t1)
+                beq $t9, $s7, CHECK_RIGHT21
+                beq $t9, $s6, CHECK_RIGHT21
+                j NOT_SHIFT_RIGHT
+            CHECK_RIGHT21:
+                lw $t9, -64($t1)
+                beq $t9, $s7, CHECK_RIGHT22
+                beq $t9, $s6, CHECK_RIGHT22
+                j NOT_SHIFT_RIGHT
+            CHECK_RIGHT22:
+                lw $t9, -128($t1)
+                beq $t9, $s7, CHECK_RIGHT23
+                beq $t9, $s6, CHECK_RIGHT23
+                j NOT_SHIFT_RIGHT
+            CHECK_RIGHT23:
+                lw $t9, -192($t1)
+                beq $t9, $s7, SHIFT_DRAW
+                beq $t9, $s6, SHIFT_DRAW
+                j NOT_SHIFT_RIGHT
+        
+        ASSIGNRIGHT3:
+            CHECK_RIGHT30:
+                lw $t9, 0($t1)
+                beq $t9, $s7, CHECK_RIGHT31
+                beq $t9, $s6, CHECK_RIGHT31
+                j NOT_SHIFT_RIGHT
+            CHECK_RIGHT31:
+                lw $t9, 4($t1)
+                beq $t9, $s7, CHECK_RIGHT32
+                beq $t9, $s6, CHECK_RIGHT32
+                j NOT_SHIFT_RIGHT
+            CHECK_RIGHT32:
+                lw $t9, 8($t1)
+                beq $t9, $s7, CHECK_RIGHT33
+                beq $t9, $s6, CHECK_RIGHT33
+                j NOT_SHIFT_RIGHT
+            CHECK_RIGHT33:
+                lw $t9, 12($t1)
+                beq $t9, $s7, SHIFT_DRAW
+                beq $t9, $s6, SHIFT_DRAW
+                j NOT_SHIFT_RIGHT
+       
+        NOT_SHIFT_RIGHT:
+            jal Sound_effect
+            addi $t1, $t1, -4
+        SHIFT_DRAW:
+            beq $t2 0 draw_I 
             beq $t2 1 draw_1
             beq $t2 2 draw_2
             beq $t2 3 draw_3
     
     move_down:
         jal repaint
-        add $t1 $t1 64
-        beq $t2, 0, ASSIGNDOWN0
-        bne $t2, 0, ASSIGNDOWN123
+        addi $t1 $t1 64
         
+        beq $t2, 0, ASSIGNDOWN0 
+        beq $t2, 1, ASSIGNDOWN1 
+        beq $t2, 2, ASSIGNDOWN2 
+        beq $t2, 3, ASSIGNDOWN3 
+   
         ASSIGNDOWN0:
-            lw $t9, 192($t1)  # Load the byte (color) from the address in $t0 into $t1
-            j DETERMINE_DOWN
-        ASSIGNDOWN123:
-            lw $t9, 0($t1)
-            j DETERMINE_DOWN
+            CHECK_DOWN00:
+                lw $t9, 0($t1)
+                beq $t9, $s7, CHECK_DOWN01
+                beq $t9, $s6, CHECK_DOWN01
+                j NOT_SHIFT_DOWN
+            CHECK_DOWN01:
+                lw $t9, 64($t1)
+                beq $t9, $s7, CHECK_DOWN02
+                beq $t9, $s6, CHECK_DOWN02
+                j NOT_SHIFT_DOWN
+            CHECK_DOWN02:
+                lw $t9, 128($t1)
+                beq $t9, $s7, CHECK_DOWN03
+                beq $t9, $s6, CHECK_DOWN03
+                j NOT_SHIFT_DOWN
+            CHECK_DOWN03:
+                lw $t9, 192($t1)
+                beq $t9, $s7, SHIFT_DRAW
+                beq $t9, $s6, SHIFT_DRAW
+                j NOT_SHIFT_DOWN
             
-        DETERMINE_DOWN:
-        beq $t9, $v0, DRAW
-        beq $t9, $v1, DRAW
-        addi $t1 $t1 -64
+        ASSIGNDOWN1:
+            CHECK_DOWN10:
+                lw $t9, 0($t1)
+                beq $t9, $s7, CHECK_DOWN11
+                beq $t9, $s6, CHECK_DOWN11
+                j NOT_SHIFT_DOWN
+            CHECK_DOWN11:
+                lw $t9, -4($t1)
+                beq $t9, $s7, CHECK_DOWN12
+                beq $t9, $s6, CHECK_DOWN12
+                j NOT_SHIFT_DOWN
+            CHECK_DOWN12:
+                lw $t9, -8($t1)
+                beq $t9, $s7, CHECK_DOWN13
+                beq $t9, $s6, CHECK_DOWN13
+                j NOT_SHIFT_DOWN
+            CHECK_DOWN13:
+                lw $t9, -12($t1)
+                beq $t9, $s7, SHIFT_DRAW
+                beq $t9, $s6, SHIFT_DRAW
+                j NOT_SHIFT_DOWN
         
-        DRAW:
-            beq $t2 0 draw_I
+        ASSIGNDOWN2:
+            CHECK_DOWN20:
+                lw $t9, 0($t1)
+                beq $t9, $s7, CHECK_DOWN21
+                beq $t9, $s6, CHECK_DOWN21
+                j NOT_SHIFT_DOWN
+            CHECK_DOWN21:
+                lw $t9, -64($t1)
+                beq $t9, $s7, CHECK_DOWN22
+                beq $t9, $s6, CHECK_DOWN22
+                j NOT_SHIFT_DOWN
+            CHECK_DOWN22:
+                lw $t9, -128($t1)
+                beq $t9, $s7, CHECK_DOWN23
+                beq $t9, $s6, CHECK_DOWN23
+                j NOT_SHIFT_DOWN
+            CHECK_DOWN23:
+                lw $t9, -192($t1)
+                beq $t9, $s7, SHIFT_DRAW
+                beq $t9, $s6, SHIFT_DRAW
+                j NOT_SHIFT_DOWN
+        
+        ASSIGNDOWN3:
+            CHECK_DOWN30:
+                lw $t9, 0($t1)
+                beq $t9, $s7, CHECK_DOWN31
+                beq $t9, $s6, CHECK_DOWN31
+                j NOT_SHIFT_DOWN
+            CHECK_DOWN31:
+                lw $t9, 4($t1)
+                beq $t9, $s7, CHECK_DOWN32
+                beq $t9, $s6, CHECK_DOWN32
+                j NOT_SHIFT_DOWN
+            CHECK_DOWN32:
+                lw $t9, 8($t1)
+                beq $t9, $s7, CHECK_DOWN33
+                beq $t9, $s6, CHECK_DOWN33
+                j NOT_SHIFT_DOWN
+            CHECK_DOWN33:
+                lw $t9, 12($t1)
+                beq $t9, $s7, SHIFT_DRAW
+                beq $t9, $s6, SHIFT_DRAW
+                j NOT_SHIFT_DOWN
+       
+        NOT_SHIFT_DOWN:
+            jal Sound_effect
+            addi $t1, $t1, -64
+        SHIFT_DRAW:
+            beq $t2 0 draw_I 
             beq $t2 1 draw_1
             beq $t2 2 draw_2
             beq $t2 3 draw_3
-    
+            
+ ################################ ROTATE ####################################   
     rotate:
         jal repaint
         
@@ -384,33 +694,58 @@ processing_loop: # step 4: enter the main processing loop for each tetris
         beq $t2 3 check_rotate_3_0
         
         check_rotate_0_1:
-        lw $t9, -4($t1)
-        beq $t9, $a3, draw_I
-        lw $t8, -8($t1)
-        beq $t8, $a3, draw_I
-        lw $t7, -12($t1)
-        beq $t7, $a3, draw_I
-        j ROTATE_CHECKED
+            CHECK_ROTATE11:
+                lw $t9, -4($t1)
+                beq $t9, $s7, CHECK_ROTATE12
+                beq $t9, $s6, CHECK_ROTATE12
+                j draw_I
+            CHECK_ROTATE12:
+                lw $t9, -8($t1)
+                beq $t9, $s7, CHECK_ROTATE13
+                beq $t9, $s6, CHECK_ROTATE13
+                j draw_I
+            CHECK_ROTATE13:
+                lw $t9, -12($t1)
+                beq $t9, $s7, ROTATE_CHECKED
+                beq $t9, $s6, ROTATE_CHECKED
+                j draw_I
         
         check_rotate_2_3:
-        lw $t9, 4($t1)
-        beq $t9, $a3, draw_2
-        lw $t8, 8($t1)
-        beq $t8, $a3, draw_2
-        lw $t7, 12($t1)
-        beq $t7, $a3, draw_2
-        j ROTATE_CHECKED
+            CHECK_ROTATE31:
+                lw $t9, 4($t1)
+                beq $t9, $s7, CHECK_ROTATE32
+                beq $t9, $s6, CHECK_ROTATE32
+                j draw_2
+            CHECK_ROTATE32:
+                lw $t9, 8($t1)
+                beq $t9, $s7, CHECK_ROTATE33
+                beq $t9, $s6, CHECK_ROTATE33
+                j draw_2
+            CHECK_ROTATE33:
+                lw $t9, 12($t1)
+                beq $t9, $s7, ROTATE_CHECKED
+                beq $t9, $s6, ROTATE_CHECKED
+                j draw_2
         
         check_rotate_3_0:
-        lw $t9, 64($t1)
-        beq $t9, $a3, draw_3
-        lw $t8, 128($t1)
-        beq $t8, $a3, draw_3
-        lw $t7, 196($t1)
-        beq $t7, $a3, draw_3
-        j ROTATE_CHECKED
+            CHECK_ROTATE21:
+                lw $t9, 64($t1)
+                beq $t9, $s7, CHECK_ROTATE22
+                beq $t9, $s6, CHECK_ROTATE22
+                j draw_3
+            CHECK_ROTATE22:
+                lw $t9, 128($t1)
+                beq $t9, $s7, CHECK_ROTATE23
+                beq $t9, $s6, CHECK_ROTATE23
+                j draw_3
+            CHECK_ROTATE23:
+                lw $t9, 192($t1)
+                beq $t9, $s7, ROTATE_CHECKED
+                beq $t9, $s6, ROTATE_CHECKED
+                j draw_3
         
         ROTATE_CHECKED:
+        
         # rotate based on current direction
         beq $t2 0 rotate_0_1
         beq $t2 1 rotate_1_2
@@ -419,17 +754,21 @@ processing_loop: # step 4: enter the main processing loop for each tetris
         
         rotate_0_1:
             li $t2 1 # change direction
+            jal Sound_effect1
             j draw_1
         rotate_1_2:
             li $t2 2
+            jal Sound_effect1
             j draw_2
         
         rotate_2_3:
             li $t2 3
+            jal Sound_effect1
             j draw_3
             
         rotate_3_0:
             li $t2 0
+            jal Sound_effect1
             j draw_I
         
         draw_1:
@@ -491,4 +830,67 @@ processing_loop: # step 4: enter the main processing loop for each tetris
     quit:
         li $v0 10
         syscall
-
+    
+game_over:
+    la $a0, gameOverMsg
+    li $v0, 4
+    syscall
+    
+    li $t0 0 # counter for drawing the black background
+    move $t1 $s0 # initial position to start
+    draw_black_loop:
+        bge $t0 256 draw_button
+        sw $s6 0($t1)
+        addi $t1 $t1 4
+        addi $t0 $t0 1
+        j draw_black_loop
+    
+    draw_button:
+    move $t1 $s0
+    addi $t1 $t1 28 # start from the center
+    addi $t1 $t1 320 # start from the 6th line 
+    li $t2 0 # row counter
+    draw_button_row:
+        bge $t2 2 wait_retry
+        addi $t2 $t2 1
+        addi $t1 $t1 64
+        
+        li $t3 0 # column counter
+        move $t4 $t1
+        draw_button_column:
+            bge $t3 3 draw_button_row
+            sw $s2 0($t4)
+            addi $t3 $t3 1
+            addi $t4 $t4 4
+            j draw_button_column
+        
+    wait_retry:
+        lw $t3 ADDR_KBRD
+        lw $t4 0($t3) # load first word from keyboard
+        beq $t4 0 wait_retry # no key
+        
+        lw $t7 4($t3) # load the keyboard value
+        beq $t7 'r' restart
+        j wait_retry
+    
+    restart:
+        j start
+    
+    Sound_effect:
+    	li $v0, 31 #Play audio syscall code
+    	li $a0, 53 #pitch
+    	li $a1, 50 #Duration
+    	li $a2, 14 #Instrument
+    	li $a3, 127 #Volume 
+    	syscall
+    	
+    	jr $ra
+    Sound_effect1:
+    	li $v0, 31 #Play audio syscall code
+    	li $a0, 100 #pitch
+    	li $a1, 50 #Duration
+    	li $a2, 14 #Instrument
+    	li $a3, 127 #Volume 
+    	syscall
+    	
+    	jr $ra
