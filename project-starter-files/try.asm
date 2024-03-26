@@ -209,7 +209,17 @@ remove_line_loop: # step 0: remove line
                 store_value:
                     beq $t9 $v0 update_move_line
                     beq $t9 $v1 update_move_line
+                    beq $t8 $v0 to_grey #if previous line is black, change it to grey
+                    beq $t8 $v1 to_black #if previous line is grey, change it to black
+                    j update_move_line
+                to_grey:
+                    move $t8 $v1
                     sw $t8 64($t7) # store the color from previous line to current line
+                    j update_move_line
+                to_black:
+                    move $t8 $v0
+                    sw $t8 64($t7) # store the color from previous line to current line
+                    j update_move_line
                 update_move_line:
                     addi $t6 $t6 1
                     addi $t7 $t7 4

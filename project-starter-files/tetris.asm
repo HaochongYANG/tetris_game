@@ -100,7 +100,7 @@ final:
     li $t4, 0x00ff00            # Load the color black into $t4
     
     li $a0, 0                    # x-coordinate (column) is 0 for the leftmost column
-    li $a1, 0                    # Starting y-coordinate (row) is 0
+    li $a1, 1                   # Starting y-coordinate (row) is 0
     li $a2, 16                   # Ending y-coordinate (31 rows in total)
     sll $t1, $a0, 2              # Shift left x-coordinate by 2 to account for word size (4 bytes per pixel)
 
@@ -119,7 +119,7 @@ final1:
     li $t4, 0x00ff00             # Load the color black into $t4
     
     li $a0, 15                   # x-coordinate (column) is 1 for the second leftmost column
-    li $a1, 0                    # Starting y-coordinate (row) is 0
+    li $a1, 1                    # Starting y-coordinate (row) is 0
     li $a2, 16                   # Ending y-coordinate (31 rows in total)
     
     sll $t1, $a0, 2              # Shift left x-coordinate by 2 to account for word size (4 bytes per pixel)
@@ -170,10 +170,66 @@ li $s1 0xff0000 # red
 li $s2 0x00ff00 # green
 li $s3 0x0000ff # blue
 
-li $s4 0 # initial y position
+li $s4 64 # initial y position
 li $s5 32 # initial x position
 
+addi $t1 $s0 4 # first address to start
+li $t0 1 # coutner for the remove line loop
+remove_line_loop: # step 0: remove line
+    bge $t0 15 check_terminate
+    li $t6 64 # constant
+    mul $t2 $t6 $t0 # offset to add
+    add $t2 $t1 $t2 # current starting address for the row
+    
+    move $t3 $t2 # temp to store the current starting point
+    li $t5 0 # counter for detect line loop
+    detect_line:
+        bge $t5 14 move_all_line_loop # if not break, remove the entire line
+        lw $t4 0($t3)
+        beq $t4, $v0, update_remove_line_loop
+        beq $t4, $v1, update_remove_line_loop
+        addi $t3 $t3 4
+        addi $t5 $t5 1
+        j detect_line
+    
+    move_all_line_loop: # use the color from previous line
+        move $t5 $t0 # current line
+        move $t3 $t2 # temp to store the current starting point
+        move_all_line:
+            ble $t5 0 update_remove_line_loop
+            addi $t5 $t5 -1 # decrement counter
+            addi $t3 $t3 -64 # starting address for the previous row
+            
+            li $t6 0 # counter for move line
+            move $t7 $t3 # temp to store starting address for the previous row
+            move_line:
+                bge $t6 14 move_all_line
+                lw $t8 0($t7) # value from previous line
+                lw $t9 64($t7) # value from current line
+                store_value:
+                    beq $t9 $v0 update_move_line
+                    beq $t9 $v1 update_move_line
+                    beq $t8 $v0 to_grey #if previous line is black, change it to grey
+                    beq $t8 $v1 to_black #if previous line is grey, change it to black
+                    j update_move_line
+                to_grey:
+                    move $t8 $v1
+                    sw $t8 64($t7) # store the color from previous line to current line
+                    j update_move_line
+                to_black:
+                    move $t8 $v0
+                    sw $t8 64($t7) # store the color from previous line to current line
+                    j update_move_line
+                update_move_line:
+                    addi $t6 $t6 1
+                    addi $t7 $t7 4
+                    j move_line
 
+    update_remove_line_loop:
+        addi $t0 $t0 1
+        j remove_line_loop
+        
+check_terminate:
 # step 1: check for terminate condition
 # step 2: store the game board
 store_board:
@@ -201,7 +257,8 @@ store_row_loop:
         
 end_store:
     
-add $t1 $s5 $s0 # temp to store current address
+add $t1 $s5 $s0 
+add $t1 $t1 $s4 # temp to store current address
 li $t2 0 # store the current direction of tetris
 draw_I: # step 3: draw tetris
     li $t6 0 # counter to store height
@@ -220,10 +277,12 @@ processing_loop: # step 4: enter the main processing loop for each tetris
         bne $t2, 0, try_move_123
         
         try_move_0:
-            lw $t9, 192($t1)  # Load the byte (color) from the address in $t0 into $t1
+            lw $t9, 192($t1) # Load the byte (color) from the address in $t0 into $t1
+            addi $t1 $t1 -64
             j not_black
         try_move_123:
             lw $t9, 0($t1)
+            addi $t1 $t1 -64
             j not_black
         
         not_black:
@@ -231,7 +290,6 @@ processing_loop: # step 4: enter the main processing loop for each tetris
             j check_keyboard
         
         not_grey:
-            addi $t1 $t1 -64
             bne $t9, $v1, tetris_loop   
             
     check_keyboard:
