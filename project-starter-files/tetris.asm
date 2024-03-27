@@ -139,7 +139,7 @@ addi $a1, $zero, 16	# set width = 10
 # Draw a rectangle:
 add $t6, $zero, $zero	# Set index value ($t6) to zero
 draw_rect_loop:
-beq $t6, $a0, draw_random_block  	# If $t6 == height ($a0), jump to end
+beq $t6, $a0, next_tetris_preview  	# If $t6 == height ($a0), jump to end
 
 # Draw a line:
 add $t5, $zero, $zero	# Set index value ($t5) to zero
@@ -156,9 +156,37 @@ addi $t0, $t0, 88	# Set $t0 to the first pixel of the next line.
 addi $t6, $t6, 1	#   - Increment $t6 by 1
 j draw_rect_loop	#   - Jump to start of rectangle drawing loop
 
+next_tetris_preview:  
+    li $t5, 0 # counter for drawing the black background
+    lw $t0, ADDR_DSPL
+    addi $s0, $t0, 1024 # Adjust base position if necessary
+    move $t1, $s0 # initial position to start drawing the background
 
+    # Draw the black background
+    draw_black_loop2:
+        bge $t5, 256, end_draw_background # Check if the loop has filled 256 pixels (64x4 for 1x4 stick area)
+        sw $s6, 0($t1)
+        addi $t1, $t1, 4
+        addi $t5, $t5, 1
+        j draw_black_loop2
 
+    end_draw_background:
+    
+    # Correctly position and draw the 1x4 vertical stick centered
+    move $t1, $s0 # Reset $t1 to start position for drawing the stick
+    addi $t1, $t1, 32 # Center the stick horizontally
+    addi $t1, $t1, 384 # Move down to the intended start line vertically
 
+    li $t2, 0 # Initialize counter for drawing 1x4 stick vertically
+    draw_stick_loop:
+        bge $t2, 4, end_draw_stick # Break loop after drawing 4 vertical segments
+        li $s2, 0x0066CC # Color for the stick
+        sw $s2, 0($t1) # Draw stick segment
+        addi $t1, $t1, 64 # Move to the next line (assuming 16 pixels per line, change as needed)
+        addi $t2, $t2, 1
+        j draw_stick_loop
+
+    end_draw_stick:
 
 # ----------- main game --------------
 draw_random_block:
@@ -196,17 +224,22 @@ draw_random_block_loop:
         addi $t0 $t0 1
         j draw_random_block_loop
 
+li $s5, -500000 # Global counter for deleting rows
+
 tetris_loop:
 lw $s0 ADDR_DSPL
 
 li $s1 0xff0000 # red
 li $s2 0x00ff00 # green
 li $s3 0x0000ff # blue
-
 li $s4 10000000 # counter for clock
+add $s4, $s4, $s5
 # step 0: remove line
 addi $t1 $s0 4 # first address to start
 li $t0 1 # coutner for the remove line loop
+
+
+
 remove_line_loop: # step 0: remove line
     bge $t0 15 check_terminate
     li $t6 64 # constant
@@ -225,6 +258,7 @@ remove_line_loop: # step 0: remove line
         j detect_line
     
     move_all_line_loop: # use the color from previous line
+        addi $s5, $s5, -500000
         move $t5 $t0 # current line
         move $t3 $t2 # temp to store the current starting point
         move_all_line:
@@ -317,18 +351,109 @@ draw_I:
 # step 4: enter the main processing loop for each tetris
 processing_loop: 
     movable:
-        add $t1 $t1 64
-        beq $t2, 0, try_move_0
-        bne $t2, 0, try_move_123
+        add $t1, $t1, 64
         
-        try_move_0:
+        beq $t2, 0, TRYMOVE0 
+        beq $t2, 1, TRYMOVE1 
+        beq $t2, 2, TRYMOVE2 
+        beq $t2, 3, TRYMOVE3
+        
+        TRYMOVE0:
             lw $t9, 192($t1) # Load the byte (color) from the address in $t0 into $t1
             addi $t1 $t1 -64
             j not_black
-        try_move_123:
-            lw $t9, 0($t1)
-            addi $t1 $t1 -64
-            j not_black
+        
+        TRYMOVE1:
+            TRYMOVE10:
+                lw $t9, 0($t1)
+                beq $t9, $s7, TRYMOVE11
+                beq $t9, $s6, TRYMOVE11
+                j EARLYBREAK_1
+            TRYMOVE11:
+                lw $t9, -4($t1)
+                beq $t9, $s7, TRYMOVE12
+                beq $t9, $s6, TRYMOVE12
+                j EARLYBREAK_1
+            TRYMOVE12:
+                lw $t9, -8($t1)
+                beq $t9, $s7, TRYMOVE13
+                beq $t9, $s6, TRYMOVE13
+                j EARLYBREAK_1
+            TRYMOVE13:
+                lw $t9, -12($t1)
+                
+                beq $t9, $s7, jump_to_keyboard
+                beq $t9, $s6, jump_to_keyboard
+                EARLYBREAK_1:
+                    addi $t1 $t1 -64
+                    j tetris_loop
+        
+        TRYMOVE2:
+            TRYMOVE20:
+                lw $t9, 0($t1)
+                beq $t9, $s7, TRYMOVE21
+                beq $t9, $s6, TRYMOVE21
+                j EARLYBREAK_2
+            TRYMOVE21:
+                lw $t9, -64($t1)
+                beq $t9, $s7, TRYMOVE22
+                beq $t9, $s6, TRYMOVE22
+                j EARLYBREAK_2
+            TRYMOVE22:
+                lw $t9, -128($t1)
+                beq $t9, $s7, TRYMOVE23
+                beq $t9, $s6, TRYMOVE23
+                j EARLYBREAK_2
+            TRYMOVE23:
+                lw $t9, -192($t1)
+                beq $t9, $s7, jump_to_keyboard
+                beq $t9, $s6, jump_to_keyboard
+                EARLYBREAK_2:
+                    addi $t1 $t1 -64
+                    j tetris_loop
+        
+        TRYMOVE3:
+            TRYMOVE30:
+                lw $t9, 0($t1)
+                beq $t9, $s7, TRYMOVE31
+                beq $t9, $s6, TRYMOVE31
+                j EARLYBREAK_3
+            TRYMOVE31:
+                lw $t9, 4($t1)
+                beq $t9, $s7, TRYMOVE32
+                beq $t9, $s6, TRYMOVE32
+                j EARLYBREAK_3
+            TRYMOVE32:
+                lw $t9, 8($t1)
+                beq $t9, $s7, TRYMOVE33
+                beq $t9, $s6, TRYMOVE33
+                j EARLYBREAK_3
+            TRYMOVE33:
+                lw $t9, 12($t1)
+                beq $t9, $s7, jump_to_keyboard
+                beq $t9, $s6, jump_to_keyboard
+                EARLYBREAK_3:
+                    addi $t1 $t1 -64
+                    j tetris_loop
+        
+        jump_to_keyboard:
+            addi $t1, $t1, -64
+            j check_keyboard
+        
+        # add $t1 $t1 64
+        # beq $t2, 0, try_move_0
+        # bne $t2, 0, try_move_123
+        
+        # try_move_0:
+            # lw $t9, 192($t1) # Load the byte (color) from the address in $t0 into $t1
+            # addi $t1 $t1 -64
+            # j not_black
+        # try_move_123:
+            # lw $t9, 0($t1)
+            # addi $t1 $t1 -64
+            # j not_black
+        
+
         
         not_black:
             bne $t9, $s6, not_grey
@@ -839,7 +964,7 @@ game_over:
     li $t0 0 # counter for drawing the black background
     move $t1 $s0 # initial position to start
     draw_black_loop:
-        bge $t0 256 draw_button
+        bge $t0 512 draw_button
         sw $s6 0($t1)
         addi $t1 $t1 4
         addi $t0 $t0 1
@@ -874,6 +999,7 @@ game_over:
         j wait_retry
     
     restart:
+        li $s5, -500000
         j start
     
     Sound_effect:
