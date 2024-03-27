@@ -1,13 +1,13 @@
 ################ CSC258H1F Winter 2024 Assembly Final Project ##################
 # This file contains our implementation of Tetris.
 #
-# Student 1: Name, Student Number
-# Student 2: Name, Student Number (if applicable)
+# Student 1: Yifan Liu, 1007341681
+# Student 2: Haochong Yang, 1007787682
 ######################## Bitmap Display Configuration ########################
-# - Unit width in pixels:       TODO
-# - Unit height in pixels:      TODO
-# - Display width in pixels:    TODO
-# - Display height in pixels:   TODO
+# - Unit width in pixels:       8
+# - Unit height in pixels:      8
+# - Display width in pixels:    128
+# - Display height in pixels:   256
 # - Base Address for Display:   0x10008000 ($gp)
 ##############################################################################
 
@@ -23,7 +23,7 @@ ADDR_KBRD:
     .word 0xffff0000
 
 BOARD_BUFFER:
-    .space 16384 # to store 128 * 128 board
+    .space 1024 # to store 128 * 128 board
 
 gameOverMsg: .asciiz "Game Over! Press 'r' to restart !"
 
@@ -316,11 +316,11 @@ store_board:
     move $t3 $s0 # address to store
 
 store_row_loop:
-    bge $t1 128 end_store
+    bge $t1 16 end_store
     li $t2 0 # store x coordinate
     
     store_column_loop:
-        bge $t2 128 update_row
+        bge $t2 16 update_row
         lw $t4 0($t3) # Load the pixel color from the display
         sw $t4, 0($t0)  # Store it in the buffer
         
@@ -553,11 +553,111 @@ processing_loop:
         j move_down
     
     pause_loop:
-        lw $t4 0($t3)
-        beq $t4 0 pause_loop
-        lw $t7 4($t3)
-        bne $t7 'p' pause_loop
-        j check_keyboard
+    
+    # Setup for drawing background and initial position remains the same
+    li $t6, 0 # counter for drawing the black background
+    lw $s0, ADDR_DSPL
+    addi $t8, $s0, 1024 # Adjust base position if necessary
+    move $t0, $t8 # initial position to start drawing the background
+
+    # Draw the black background
+    draw_black_loop3:
+        bge $t6, 256, end_draw_background_paused # Check if the loop has filled 256 pixels
+        sw $s6, 0($t0)
+        addi $t0, $t0, 4
+        addi $t6, $t6, 1
+        j draw_black_loop3
+
+    end_draw_background_paused:
+    
+    # Reset the position for drawing "P"
+    move $t0, $t8
+    addi $t0, $t0, 32 # Center the figure horizontally
+    addi $t0, $t0, 384 # Move down to start line vertically
+
+    # Draw vertical backbone of "P"
+    li $t3, 0 # Initialize counter for drawing vertical line
+    li $s2, 0x0066CC # Color for "P"
+    vertical_line_loop_pause:
+        bge $t3, 6, draw_top_horizontal_part # Draw 6 segments for the vertical backbone
+        sw $s2, 0($t0)
+        addi $t0, $t0, 64 # Move to the next line
+        addi $t3, $t3, 1
+        j vertical_line_loop_pause
+
+    # Draw the top horizontal part of "P"
+    draw_top_horizontal_part:
+    move $t0, $t8 # Reset position to top of "P"
+    addi $t0, $t0, 416 # Adjust for top horizontal part start
+    li $t3, 0 # Row counter for horizontal part
+    
+    horizontal_part_loop:
+        bge $t3, 3, end_draw_p # Break after 3 rows
+        li $t7, 0 # Column counter
+        move $t6, $t0 # Current start position for the row
+
+        # Draw 3x3 top part with a space in the middle row
+        column_loop:
+            bge $t7, 3, next_row # Break after 3 columns
+            # Skip the middle of the top part (second row, second column)
+            bne $t3, 1, draw_pixel
+            beq $t7, 1, skip_pixel
+            
+            draw_pixel:
+                sw $s2, 0($t6) # Draw pixel
+            
+            skip_pixel:
+                addi $t6, $t6, 4 # Move to next column
+                addi $t7, $t7, 1
+                j column_loop
+        
+        next_row:
+            addi $t0, $t0, 64 # Move to start of next row
+            addi $t3, $t3, 1
+            j horizontal_part_loop
+
+    end_draw_p:
+    lw $t3 ADDR_KBRD
+    lw $t4, 0($t3) # Check if a key is pressed
+    beq $t4, 0, pause_loop # Loop until a key is detected
+
+    beq $t4 0 pause_loop
+    resume_game:
+    # After drawing "P", wait for 'p' press to resume
+    lw $t7, 4($t3)
+    bne $t7, 'p', pause_loop # If 'p' is not pressed, stay in pause
+    
+    next_tetris_preview_1:  
+    li $t5, 0 # counter for drawing the black background
+    addi $t8, $s0, 1024 # Adjust base position if necessary
+    move $t0, $t8 # initial position to start drawing the background
+
+    # Draw the black background
+    draw_black_loop2_1:
+        bge $t5, 256, end_draw_background_1 # Check if the loop has filled 256 pixels (64x4 for 1x4 stick area)
+        sw $s6, 0($t0)
+        addi $t0, $t0, 4
+        addi $t5, $t5, 1
+        j draw_black_loop2_1
+
+    end_draw_background_1:
+    
+    # Correctly position and draw the 1x4 vertical stick centered
+    move $t0, $t8 # Reset $t1 to start position for drawing the stick
+    addi $t0, $t0, 32 # Center the stick horizontally
+    addi $t0, $t0, 384 # Move down to the intended start line vertically
+
+    li $t9, 0 # Initialize counter for drawing 1x4 stick vertically
+    draw_stick_loop_1:
+        bge $t9, 4, check_keyboard # Break loop after drawing 4 vertical segments
+        li $s2, 0x0066CC # Color for the stick
+        sw $s2, 0($t0) # Draw stick segment
+        addi $t0, $t0, 64 # Move to the next line (assuming 16 pixels per line, change as needed)
+        addi $t9, $t9, 1
+        j draw_stick_loop_1
+
+    j check_keyboard # Proceed to check other keyboard inputs or resume game
+        
         
 move_left:
         jal repaint
@@ -656,7 +756,6 @@ move_left:
                 beq $t9, $s6, SHIFT_DRAW
                 j NOT_SHIFT_LEFT
        
-        
         NOT_SHIFT_LEFT:
             jal Sound_effect
             addi $t1, $t1, 4
@@ -1015,14 +1114,15 @@ move_left:
     repaint:
         la $t0 BOARD_BUFFER
         li $t3 0 # store y coordinate
+        lw $s0, ADDR_DSPL
         move $t6 $s0 # address to access
         
     repaint_row:
-        bge $t3 128 end_repaint
+        bge $t3 16 end_repaint
         li $t4 0 # store x coordinate 
         
         repaint_column:
-            bge $t4 128 update_row_repaint
+            bge $t4 16 update_row_repaint
             lw $t5 0($t0) # read color from buffer
             sw $t5 0($t6) # store color to address
             
@@ -1047,46 +1147,89 @@ game_over:
     li $v0, 4
     syscall
     
-    li $t0 0 # counter for drawing the black background
-    move $t1 $s0 # initial position to start
+    li $t0, 0 # counter for drawing the black background
+    move $t1, $s0 # initial position to start
+    addi $t1, $t1, 1024
     draw_black_loop:
-        bge $t0 512 draw_button
-        sw $s6 0($t1)
-        addi $t1 $t1 4
-        addi $t0 $t0 1
+        bge $t0, 512, draw_R # Adjusted target label
+        sw $s6, 0($t1)
+        addi $t1, $t1, 4
+        addi $t0, $t0, 1
         j draw_black_loop
     
-    draw_button:
-    move $t1 $s0
-    addi $t1 $t1 28 # start from the center
-    addi $t1 $t1 320 # start from the 6th line 
-    li $t2 0 # row counter
-    draw_button_row:
-        bge $t2 2 wait_retry
-        addi $t2 $t2 1
-        addi $t1 $t1 64
-        
-        li $t3 0 # column counter
-        move $t4 $t1
-        draw_button_column:
-            bge $t3 3 draw_button_row
-            sw $s2 0($t4)
-            addi $t3 $t3 1
-            addi $t4 $t4 4
-            j draw_button_column
+    # Start drawing R
+    draw_R:
+    move $t1, $s0
+    addi $t1, $t1, 1024
+    addi $t1, $t1, 32 # Center the R horizontally
+    addi $t1, $t1, 320 # Adjust vertical start position
+    
+    # Draw vertical backbone of R
+    li $t2, 0 # Initialize counter for vertical line
+    draw_R_vertical:
+        bge $t2, 6, draw_R_top_horizontal # Stop after 6 segments
+        sw $s2, 0($t1) # Draw segment
+        addi $t1, $t1, 64 # Move to the next line
+        addi $t2, $t2, 1
+        j draw_R_vertical
+    
+    # Draw the top horizontal part of R
+    draw_R_top_horizontal:
+    move $t1, $s0 # Reset position to top of R
+    addi $t1, $t1, 1024
+    addi $t1, $t1, 352 # Move to start of top horizontal part
+    li $t2, 0 # Counter for horizontal part
+    draw_R_horizontal_loop:
+        bge $t2, 3, draw_R_diagonal # Stop after 3 rows, then start drawing diagonal leg
+        li $t3, 0 # Column counter
+        move $t4, $t1 # Current start position for row
+
+        # Draw 3x3 top part, skipping middle cell on second row
+        draw_R_horizontal_column:
+            bge $t3, 3, next_R_row
+            # Skip drawing in the middle of the top part (2nd row, 2nd column)
+            bne $t2, 1, draw_R_pixel
+            beq $t3, 1, skip_R_pixel
+
+            draw_R_pixel:
+                sw $s2, 0($t4)
+            
+            skip_R_pixel:
+                addi $t4, $t4, 4
+                addi $t3, $t3, 1
+                j draw_R_horizontal_column
+
+        next_R_row:
+            addi $t1, $t1, 64
+            addi $t2, $t2, 1
+            j draw_R_horizontal_loop
+
+    # Draw the diagonal leg of R
+    draw_R_diagonal:
+    move $t1, $s0
+    addi $t1, $t1, 1024
+    addi $t1, $t1, 548 # Adjust position for the diagonal leg's start
+    li $t2, 0
+    draw_R_diagonal_leg:
+        bge $t2, 3, wait_retry # Stop after 3 segments
+        sw $s2, 0($t1)
+        addi $t1, $t1, 68 # Adjust for diagonal down-right movement
+        addi $t2, $t2, 1
+        j draw_R_diagonal_leg
         
     wait_retry:
-        lw $t3 ADDR_KBRD
-        lw $t4 0($t3) # load first word from keyboard
-        beq $t4 0 wait_retry # no key
+        lw $t3, ADDR_KBRD
+        lw $t4, 0($t3) # load first word from keyboard
+        beq $t4, 0, wait_retry # no key detected
         
-        lw $t7 4($t3) # load the keyboard value
-        beq $t7 'r' restart
+        lw $t7, 4($t3) # load the keyboard value
+        beq $t7, 'r', restart
         j wait_retry
     
     restart:
-        li $s5, -500000
-        j start
+        li $s5, -500000 # Reset or set up for game restart logic
+        j start # Assuming 'start' is the label for game start logic
+
     
     Sound_effect:
     	li $v0, 31 #Play audio syscall code
