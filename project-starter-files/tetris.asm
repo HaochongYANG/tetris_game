@@ -227,6 +227,7 @@ draw_random_block_loop:
 li $s5, -500000 # Global counter for deleting rows
 
 tetris_loop:
+li $a0 0 # timing counter
 lw $s0 ADDR_DSPL
 
 li $s1 0xff0000 # red
@@ -350,95 +351,95 @@ draw_I:
 
 # step 4: enter the main processing loop for each tetris
 processing_loop: 
-    movable:
-        add $t1, $t1, 64
+    # movable:
+        # add $t1, $t1, 64
         
-        beq $t2, 0, TRYMOVE0 
-        beq $t2, 1, TRYMOVE1 
-        beq $t2, 2, TRYMOVE2 
-        beq $t2, 3, TRYMOVE3
+        # beq $t2, 0, TRYMOVE0 
+        # beq $t2, 1, TRYMOVE1 
+        # beq $t2, 2, TRYMOVE2 
+        # beq $t2, 3, TRYMOVE3
         
-        TRYMOVE0:
-            lw $t9, 192($t1) # Load the byte (color) from the address in $t0 into $t1
-            addi $t1 $t1 -64
-            j not_black
+        # TRYMOVE0:
+            # lw $t9, 192($t1) # Load the byte (color) from the address in $t0 into $t1
+            # addi $t1 $t1 -64
+            # j not_black
         
-        TRYMOVE1:
-            TRYMOVE10:
-                lw $t9, 0($t1)
-                beq $t9, $s7, TRYMOVE11
-                beq $t9, $s6, TRYMOVE11
-                j EARLYBREAK_1
-            TRYMOVE11:
-                lw $t9, -4($t1)
-                beq $t9, $s7, TRYMOVE12
-                beq $t9, $s6, TRYMOVE12
-                j EARLYBREAK_1
-            TRYMOVE12:
-                lw $t9, -8($t1)
-                beq $t9, $s7, TRYMOVE13
-                beq $t9, $s6, TRYMOVE13
-                j EARLYBREAK_1
-            TRYMOVE13:
-                lw $t9, -12($t1)
+        # TRYMOVE1:
+            # TRYMOVE10:
+                # lw $t9, 0($t1)
+                # beq $t9, $s7, TRYMOVE11
+                # beq $t9, $s6, TRYMOVE11
+                # j EARLYBREAK_1
+            # TRYMOVE11:
+                # lw $t9, -4($t1)
+                # beq $t9, $s7, TRYMOVE12
+                # beq $t9, $s6, TRYMOVE12
+                # j EARLYBREAK_1
+            # TRYMOVE12:
+                # lw $t9, -8($t1)
+                # beq $t9, $s7, TRYMOVE13
+                # beq $t9, $s6, TRYMOVE13
+                # j EARLYBREAK_1
+            # TRYMOVE13:
+                # lw $t9, -12($t1)
                 
-                beq $t9, $s7, jump_to_keyboard
-                beq $t9, $s6, jump_to_keyboard
-                EARLYBREAK_1:
-                    addi $t1 $t1 -64
-                    j tetris_loop
+                # beq $t9, $s7, jump_to_keyboard
+                # beq $t9, $s6, jump_to_keyboard
+                # EARLYBREAK_1:
+                    # addi $t1 $t1 -64
+                    # j tetris_loop
         
-        TRYMOVE2:
-            TRYMOVE20:
-                lw $t9, 0($t1)
-                beq $t9, $s7, TRYMOVE21
-                beq $t9, $s6, TRYMOVE21
-                j EARLYBREAK_2
-            TRYMOVE21:
-                lw $t9, -64($t1)
-                beq $t9, $s7, TRYMOVE22
-                beq $t9, $s6, TRYMOVE22
-                j EARLYBREAK_2
-            TRYMOVE22:
-                lw $t9, -128($t1)
-                beq $t9, $s7, TRYMOVE23
-                beq $t9, $s6, TRYMOVE23
-                j EARLYBREAK_2
-            TRYMOVE23:
-                lw $t9, -192($t1)
-                beq $t9, $s7, jump_to_keyboard
-                beq $t9, $s6, jump_to_keyboard
-                EARLYBREAK_2:
-                    addi $t1 $t1 -64
-                    j tetris_loop
+        # TRYMOVE2:
+            # TRYMOVE20:
+                # lw $t9, 0($t1)
+                # beq $t9, $s7, TRYMOVE21
+                # beq $t9, $s6, TRYMOVE21
+                # j EARLYBREAK_2
+            # TRYMOVE21:
+                # lw $t9, -64($t1)
+                # beq $t9, $s7, TRYMOVE22
+                # beq $t9, $s6, TRYMOVE22
+                # j EARLYBREAK_2
+            # TRYMOVE22:
+                # lw $t9, -128($t1)
+                # beq $t9, $s7, TRYMOVE23
+                # beq $t9, $s6, TRYMOVE23
+                # j EARLYBREAK_2
+            # TRYMOVE23:
+                # lw $t9, -192($t1)
+                # beq $t9, $s7, jump_to_keyboard
+                # beq $t9, $s6, jump_to_keyboard
+                # EARLYBREAK_2:
+                    # addi $t1 $t1 -64
+                    # j tetris_loop
         
-        TRYMOVE3:
-            TRYMOVE30:
-                lw $t9, 0($t1)
-                beq $t9, $s7, TRYMOVE31
-                beq $t9, $s6, TRYMOVE31
-                j EARLYBREAK_3
-            TRYMOVE31:
-                lw $t9, 4($t1)
-                beq $t9, $s7, TRYMOVE32
-                beq $t9, $s6, TRYMOVE32
-                j EARLYBREAK_3
-            TRYMOVE32:
-                lw $t9, 8($t1)
-                beq $t9, $s7, TRYMOVE33
-                beq $t9, $s6, TRYMOVE33
-                j EARLYBREAK_3
-            TRYMOVE33:
-                lw $t9, 12($t1)
-                beq $t9, $s7, jump_to_keyboard
-                beq $t9, $s6, jump_to_keyboard
-                EARLYBREAK_3:
-                    addi $t1 $t1 -64
-                    j tetris_loop
+        # TRYMOVE3:
+            # TRYMOVE30:
+                # lw $t9, 0($t1)
+                # beq $t9, $s7, TRYMOVE31
+                # beq $t9, $s6, TRYMOVE31
+                # j EARLYBREAK_3
+            # TRYMOVE31:
+                # lw $t9, 4($t1)
+                # beq $t9, $s7, TRYMOVE32
+                # beq $t9, $s6, TRYMOVE32
+                # j EARLYBREAK_3
+            # TRYMOVE32:
+                # lw $t9, 8($t1)
+                # beq $t9, $s7, TRYMOVE33
+                # beq $t9, $s6, TRYMOVE33
+                # j EARLYBREAK_3
+            # TRYMOVE33:
+                # lw $t9, 12($t1)
+                # beq $t9, $s7, jump_to_keyboard
+                # beq $t9, $s6, jump_to_keyboard
+                # EARLYBREAK_3:
+                    # addi $t1 $t1 -64
+                    # j tetris_loop
         
-        jump_to_keyboard:
-            addi $t1, $t1, -64
-            j check_keyboard
+        # jump_to_keyboard:
+            # addi $t1, $t1, -64
+            # j check_keyboard
         
         # add $t1 $t1 64
         # beq $t2, 0, try_move_0
@@ -453,16 +454,83 @@ processing_loop:
             # addi $t1 $t1 -64
             # j not_black
         
-
+        # not_black:
+            # bne $t9, $s6, not_grey
+            # j check_keyboard
         
-        not_black:
-            bne $t9, $s6, not_grey
+        # not_grey:
+            # bne $t9, $s7, tetris_loop   
+        
+    movable:
+        addi $t1 $t1 64
+        
+        beq $t2, 0, TRYDOWN0 
+        beq $t2, 1, TRYDOWN1 
+        beq $t2, 2, TRYDOWN2 
+        beq $t2, 3, TRYDOWN3 
+   
+        TRYDOWN0:
+            try_CHECK_DOWN03:
+                lw $t9, 192($t1)
+                beq $t9, $s7, can_move
+                beq $t9, $s6, can_move
+                j tetris_loop
+            
+        TRYDOWN1:
+            try_CHECK_DOWN10:
+                lw $t9, 0($t1)
+                beq $t9, $s7, try_CHECK_DOWN11
+                beq $t9, $s6, try_CHECK_DOWN11
+                j tetris_loop
+            try_CHECK_DOWN11:
+                lw $t9, -4($t1)
+                beq $t9, $s7, try_CHECK_DOWN12
+                beq $t9, $s6, try_CHECK_DOWN12
+                j tetris_loop
+            try_CHECK_DOWN12:
+                lw $t9, -8($t1)
+                beq $t9, $s7, try_CHECK_DOWN13
+                beq $t9, $s6, try_CHECK_DOWN13
+                j tetris_loop
+            try_CHECK_DOWN13:
+                lw $t9, -12($t1)
+                beq $t9, $s7, can_move
+                beq $t9, $s6, can_move
+                j tetris_loop
+        
+        TRYDOWN2:
+            CHECK_DOWN20:
+                lw $t9, 0($t1)
+                beq $t9, $s7, can_move
+                beq $t9, $s6, can_move
+                j tetris_loop
+        
+        TRYDOWN3:
+            try_CHECK_DOWN30:
+                lw $t9, 0($t1)
+                beq $t9, $s7, try_CHECK_DOWN31
+                beq $t9, $s6, try_CHECK_DOWN31
+                j tetris_loop
+            try_CHECK_DOWN31:
+                lw $t9, 4($t1)
+                beq $t9, $s7, try_CHECK_DOWN32
+                beq $t9, $s6, try_CHECK_DOWN32
+                j tetris_loop
+            try_CHECK_DOWN32:
+                lw $t9, 8($t1)
+                beq $t9, $s7, try_CHECK_DOWN33
+                beq $t9, $s6, try_CHECK_DOWN33
+                j tetris_loop
+            try_CHECK_DOWN33:
+                lw $t9, 12($t1)
+                beq $t9, $s7, can_move
+                beq $t9, $s6, can_move
+                j tetris_loop
+       
+        can_move:
+            addi $t1, $t1, -64
             j check_keyboard
-        
-        not_grey:
-            bne $t9, $s7, tetris_loop   
     
-    li $a0 0 # timing counter
     check_keyboard:
         bge $a0 $s4 gravity # gravity
         addi $a0 $a0 1 # increment timing counter
@@ -481,6 +549,7 @@ processing_loop:
     
     gravity:
         addi $s4 $s4 -1000000
+        li $a0 0
         j move_down
     
     pause_loop:
@@ -814,7 +883,7 @@ move_left:
         jal repaint
         
         beq $t2 0 check_rotate_0_1
-        beq $t2 1 rotate_1_2
+        beq $t2 1 check_rotate_1_2
         beq $t2 2 check_rotate_2_3
         beq $t2 3 check_rotate_3_0
         
@@ -835,6 +904,23 @@ move_left:
                 beq $t9, $s6, ROTATE_CHECKED
                 j draw_I
         
+        check_rotate_1_2:
+            CHECK_ROTATE21:
+                lw $t9, -64($t1)
+                beq $t9, $s7, CHECK_ROTATE22
+                beq $t9, $s6, CHECK_ROTATE22
+                j draw_1
+            CHECK_ROTATE22:
+                lw $t9, -128($t1)
+                beq $t9, $s7, CHECK_ROTATE23
+                beq $t9, $s6, CHECK_ROTATE23
+                j draw_1
+            CHECK_ROTATE23:
+                lw $t9, -192($t1)
+                beq $t9, $s7, ROTATE_CHECKED
+                beq $t9, $s6, ROTATE_CHECKED
+                j draw_1
+        
         check_rotate_2_3:
             CHECK_ROTATE31:
                 lw $t9, 4($t1)
@@ -853,17 +939,17 @@ move_left:
                 j draw_2
         
         check_rotate_3_0:
-            CHECK_ROTATE21:
+            CHECK_ROTATE01:
                 lw $t9, 64($t1)
-                beq $t9, $s7, CHECK_ROTATE22
-                beq $t9, $s6, CHECK_ROTATE22
+                beq $t9, $s7, CHECK_ROTATE02
+                beq $t9, $s6, CHECK_ROTATE02
                 j draw_3
-            CHECK_ROTATE22:
+            CHECK_ROTATE02:
                 lw $t9, 128($t1)
-                beq $t9, $s7, CHECK_ROTATE23
-                beq $t9, $s6, CHECK_ROTATE23
+                beq $t9, $s7, CHECK_ROTATE03
+                beq $t9, $s6, CHECK_ROTATE03
                 j draw_3
-            CHECK_ROTATE23:
+            CHECK_ROTATE03:
                 lw $t9, 192($t1)
                 beq $t9, $s7, ROTATE_CHECKED
                 beq $t9, $s6, ROTATE_CHECKED
