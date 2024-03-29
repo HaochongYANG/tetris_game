@@ -1,0 +1,138 @@
+\documentclass{article}
+
+%% Page Margins %%
+\usepackage{geometry}
+\geometry{
+    top = 0.75in,
+    bottom = 0.75in,
+    right = 0.75in,
+    left = 0.75in,
+}
+
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{parskip}
+
+\title{Assembly Project: Tetris}
+
+% TODO: Enter your name
+\author{Haochong Yang 1007787682 & Yifan Liu 1007341681}
+
+\begin{document}
+\maketitle
+
+\section{Instruction and Summary}
+
+\begin{enumerate}
+
+    \item Which milestones were implemented?
+
+    \begin{itemize}
+        \item Milestone 1: Completed
+        \item Milestone 2: Completed
+        \item Milestone 3: Completed
+        \item Milestone 4: Completed 8 EASY Milestones[\textbf{1}. gravity] [\textbf{2}. gravity speed up] [\textbf{3}. game over screen] [\textbf{4}. sound effect] [\textbf{5}. pause] [\textbf{6}. trigger] [\textbf{7}. random block]  [\textbf{10}. next Tetris panel]
+        \item Milestone 5: Finished 8 EASY Milestones mentioned above.
+    \end{itemize}
+
+    \item How to view the game:
+    % TODO: specify the pixes/unit, width and height of 
+    %       your game, etc.  NOTE: list these details in
+    %       the header of your breakout.asm file too!
+    
+    \begin{enumerate}
+
+    \item Unit width in pixels: 8
+    \item Display width in pixels: 128
+    \item Display height in pixels: 256
+    \item Base Address for Display: 0x10008000
+
+
+    \end{enumerate}
+
+\item Plan and Figures
+In general, our implementation revolves around storing the address of the starting point, the address of the keyboard input, and a buffer for storing the current game board in memory. Our main game loop encapsulates the entire game process. Within this loop, we start by plotting the game board and randomly generating several blocks. Subsequently, we enter a loop to handle the behavior of each generated Tetris individually.
+
+For each Tetris, we perform several key tasks. Firstly, we check whether the termination condition is met. If so, we remove any completed lines by examining whether a line is entirely filled. If a line is filled, we replace it with the line above, adjusting the grid color as necessary. After this, we store the current view into a buffer for later use. Next, upon generating a Tetris, we wait for user input to move it. Movement behaviors are managed in a way that we redraw the last view before adding the Tetris, which is retrieved from the buffer. Subsequently, we verify if it's legal to move the Tetris to decide whether its position should be adjusted. Finally, we redraw the Tetris based on the updated position.
+
+The loop for each individual Tetris terminates when the Tetris can no longer move further down. In such cases, a new Tetris is generated. The game ends if the line stack reaches a certain point.
+
+\begin{itemize}
+    \item Within the gaming loop, we first plot the:
+    \begin{figure}[ht!]
+    \centering
+    \includegraphics[width=0.3\textwidth]{scene.png}
+    \caption{scene}
+    \label{Instructions}
+    \end{figure}
+    
+    \item This is when the Tetris moving:
+    \begin{figure}[ht!]
+    \centering
+    \includegraphics[width=0.3\textwidth]{move.png}
+    \caption{move}
+    \label{Instructions}
+    \end{figure}
+
+    \item This is when game over:
+    \begin{figure}[ht!]
+    \centering
+    \includegraphics[width=0.3\textwidth]{game_over.png}
+    \caption{game over}
+    \label{Instructions}
+    \end{figure}
+
+
+\end{itemize}
+
+
+\newpage
+\item Game Summary:
+\begin{itemize}
+\item When the game begins, a random scene with some blocks will appear at the bottom of the screen.
+
+\item An "I"-shaped Tetris block will show up in the middle of the screen. Initially, it will move down one row per second, with the speed gradually increasing. The user can also control its movement by pressing keys: 'a' for left, 'd' for right, 'w' for clockwise rotation, and 's' for moving down. However, the user can only make legal moves, meaning the final destination of the Tetris must be within the board boundaries and not intersect with any other block or Tetris.
+
+\item When a line is completed, it will be removed, and the overall speed of the game will increase, making it more challenging. The game will end if the line stack reaches a certain point. The user can press 'r' to restart the game.
+
+\item During gameplay, the user can press 'q' to quit the game or 'p' to pause the game. Pressing 'p' again will resume the game.
+\end{itemize}
+
+    
+\end{enumerate}
+
+\section{Attribution Table}
+% TODO: If you worked in partners, tell us who was 
+%       responsible for which features. Some reweighting 
+%       might be possible in cases where one group member
+%       deserves extra credit for the work they put in.
+
+\begin{center}
+\begin{tabular}{|| c | c ||}
+\hline
+ Yifan Liu &  Haochong Yang \\ 
+ \hline
+ Tetris \& movement & Scene\\
+ \hline
+ Row elimination & Collision detection\\
+ \hline
+ Gravity & Sound effect \\ 
+ \hline
+ Game over \& Pause & Game speed-up trigger \\ 
+ \hline
+ 5 rows of random block & Preview panel\\
+
+ \hline
+\end{tabular}
+\end{center}
+
+% TODO: Fill out the remainder of the document as you see 
+%       fit, including as much detail as you think 
+%       necessary to better understand your code. 
+%       You can add extra sections and subsections to 
+%       help us understand why you deserve marks for 
+%       features that were more challenging than they
+%       might initially seem.
+
+
+\end{document}
